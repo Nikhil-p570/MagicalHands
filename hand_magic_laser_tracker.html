@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Hand Magic ✨</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0f;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* animated bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, #1a003a44 0%, transparent 70%),
+                radial-gradient(ellipse 60% 40% at 80% 100%, #00143a44 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  header h1 {
+    font-size: clamp(1.2rem, 4vw, 2rem);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #ff2288, #7700ff, #00aaff, #00ffcc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header p {
+    font-size: 0.7rem;
+    color: #ffffff55;
+    letter-spacing: 0.15em;
+    margin-top: 6px;
+    text-transform: uppercase;
+  }
+
+  #canvas-wrap {
+    position: relative;
+    z-index: 5;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #ffffff15;
+    box-shadow: 0 0 60px #7700ff22, 0 0 120px #00aaff11;
+    background: #000;
+    width: min(480px, 96vw);
+    aspect-ratio: 4/3;
+  }
+
+  #canvas-wrap video { display: none; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1);
+  }
+
+  #overlay-start {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: #000000cc;
+    transition: opacity 0.4s;
+  }
+
+  #overlay-start.hidden { opacity: 0; pointer-events: none; }
+
+  #overlay-start .icon {
+    font-size: 3rem;
+    animation: pulse 2s infinite ease-in-out;
+  }
+
+  @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
+
+  #overlay-start p { font-size: 0.75rem; color: #ffffff77; text-align: center; padding: 0 1rem; letter-spacing: 0.05em; }
+
+  .controls {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: 1px solid #ffffff22;
+    background: #ffffff0a;
+    color: #ffffffcc;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .btn:hover { background: #ffffff18; border-color: #ffffff44; }
+
+  .btn.active {
+    background: #7700ff33;
+    border-color: #7700ffaa;
+    box-shadow: 0 0 12px #7700ff55;
+    color: #fff;
+  }
+
+  .btn#startBtn {
+    background: linear-gradient(135deg, #7700ff55, #00aaff55);
+    border-color: #7700ffaa;
+    box-shadow: 0 0 20px #7700ff44;
+    padding: 10px 28px;
+    font-size: 0.8rem;
+  }
+
+  .btn#startBtn:hover { box-shadow: 0 0 30px #7700ff88; }
+
+  #status {
+    position: relative;
+    z-index: 10;
+    font-size: 0.65rem;
+    color: #ffffff44;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-top: 0.75rem;
+    min-height: 1.2em;
+  }
+
+  .effect-btns { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Hand Magic</h1>
+  <p>Real-time hand tracking · laser effects</p>
+</header>
+
+<div id="canvas-wrap">
+  <video id="video" playsinline></video>
+  <canvas id="output"></canvas>
+  <div id="overlay-start">
+    <div class="icon">🙌</div>
+    <button class="btn" id="startBtn" onclick="startCamera()">Start Camera</button>
+    <p>Allow camera access to see the magic.<br/>Hold up your hands and spread your fingers!</p>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="effect-btns">
+    <button class="btn active" id="btn-laser" onclick="setMode('laser')">Laser</button>
+    <button class="btn" id="btn-web" onclick="setMode('web')">Web</button>
+    <button class="btn" id="btn-glow" onclick="setMode('glow')">Glow</button>
+    <button class="btn" id="btn-rainbow" onclick="setMode('rainbow')">Rainbow</button>
+  </div>
+</div>
+<div id="status">Ready — click start</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script>
+const video = document.getElementById('video');
+const canvasWrap = document.getElementById('canvas-wrap');
+const canvas = document.getElementById('output');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const overlay = document.getElementById('overlay-start');
+
+canvas.width = 480; canvas.height = 360;
+
+let mode = 'laser';
+let lastResults = null;
+let cameraUtil = null;
+let animFrame = null;
+let handsModel = null;
+let hue = 0;
+
+const COLORS = ['#ff2288','#00ffcc','#ffdd00','#7700ff','#00aaff','#ff6600','#00ff44','#ff00aa'];
+const TIPS = [4,8,12,16,20];
+const KNUCKLES = [0,5,9,13,17];
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.effect-btns .btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + m).classList.add('active');
+}
+
+function getFlippedPts(hand) {
+  return hand.map(lm => ({ x: lm.x * canvas.width, y: lm.y * canvas.height }));
+}
+
+// Spark particle system
+const sparks = [];
+function emitSparks(x, y, col) {
+  for (let i = 0; i < 2; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.5 + Math.random() * 2;
+    sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 1, col, life: 1 });
+  }
+}
+function updateSparks() {
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx; s.y += s.vy; s.vy += 0.08;
+    s.life -= 0.045;
+    if (s.life <= 0) { sparks.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = s.life * 0.9;
+    ctx.fillStyle = s.life > 0.5 ? '#ffffff' : s.col;
+    ctx.shadowColor = s.col;
+    ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.life * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
+function drawTipDot(x, y, col) {
+  // Small tight glowing dot
+  ctx.save();
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = col;
+  ctx.shadowBlur = 12;
+  ctx.globalAlpha = 0.95;
+  ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  emitSparks(x, y, col);
+}
+
+// Draw a magical glowing beam between two points
+function magicBeam(ax, ay, bx, by, col) {
+  // Outer wide glow
+  ctx.save();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 18;
+  ctx.globalAlpha = 0.07;
+  ctx.shadowColor = col;
+  ctx.shadowBlur = 40;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  ctx.restore();
+  // Mid glow
+  ctx.save();
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 7;
+  ctx.globalAlpha = 0.25;
+  ctx.shadowColor = col;
+  ctx.shadowBlur = 30;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  ctx.restore();
+  // Inner bright core
+  ctx.save();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.9;
+  ctx.shadowColor = col;
+  ctx.shadowBlur = 20;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+  ctx.restore();
+}
+
+function drawLasers(pts, hi) {
+  const tips = TIPS.map(i => pts[i]);
+  for (let i = 0; i < tips.length; i++) {
+    for (let j = i + 1; j < tips.length; j++) {
+      const col = COLORS[(i * 2 + j + hi * 3) % COLORS.length];
+      magicBeam(tips[i].x, tips[i].y, tips[j].x, tips[j].y, col);
+    }
+  }
+  tips.forEach((p, i) => drawTipDot(p.x, p.y, COLORS[(i + hi) % COLORS.length]));
+}
+
+function drawWeb(pts, hi) {
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 2; j < pts.length; j++) {
+      const col = COLORS[(i + hi * 2) % COLORS.length];
+      magicBeam(pts[i].x, pts[i].y, pts[j].x, pts[j].y, col);
+    }
+  }
+  TIPS.forEach((ti, i) => drawTipDot(pts[ti].x, pts[ti].y, COLORS[(i + hi) % COLORS.length]));
+}
+
+function drawGlow(pts, hi) {
+  for (let i = 0; i < TIPS.length - 1; i++) {
+    const a = pts[TIPS[i]], b = pts[TIPS[i+1]];
+    const col = COLORS[(i + hi) % COLORS.length];
+    magicBeam(a.x, a.y, b.x, b.y, col);
+  }
+  TIPS.forEach((ti, i) => drawTipDot(pts[ti].x, pts[ti].y, COLORS[(i + hi) % COLORS.length]));
+}
+
+function drawRainbow(pts, hi) {
+  hue = (hue + 1.5) % 360;
+  const connections = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],
+    [0,17]
+  ];
+  connections.forEach(([a,b], i) => {
+    const h = (hue + i * 14 + hi * 90) % 360;
+    magicBeam(pts[a].x, pts[a].y, pts[b].x, pts[b].y, `hsl(${h},100%,60%)`);
+  });
+  TIPS.forEach((ti, i) => {
+    const h = (hue + i * 20 + hi * 90) % 360;
+    drawTipDot(pts[ti].x, pts[ti].y, `hsl(${h},100%,65%)`);
+  });
+}
+
+function drawCrossHands(allPts) {
+  const h0 = allPts[0], h1 = allPts[1];
+  TIPS.forEach((ti, fi) => {
+    const a = h0[ti], b = h1[ti];
+    magicBeam(a.x, a.y, b.x, b.y, COLORS[fi % COLORS.length]);
+  });
+}
+
+function renderLoop() {
+  if (!lastResults) { animFrame = requestAnimationFrame(renderLoop); return; }
+  const results = lastResults;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const allPts = results.multiHandLandmarks.map(hand => getFlippedPts(hand));
+    allPts.forEach((pts, hi) => {
+      if (mode === 'laser') drawLasers(pts, hi);
+      else if (mode === 'web') drawWeb(pts, hi);
+      else if (mode === 'glow') drawGlow(pts, hi);
+      else if (mode === 'rainbow') drawRainbow(pts, hi);
+    });
+    if (allPts.length === 2) drawCrossHands(allPts);
+    updateSparks();
+  }
+  animFrame = requestAnimationFrame(renderLoop);
+}
+
+async function startCamera() {
+  overlay.classList.add('hidden');
+  statusEl.textContent = 'Loading hand model...';
+  handsModel = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  handsModel.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.55, minTrackingConfidence: 0.5 });
+  handsModel.onResults(r => { lastResults = r; });
+  statusEl.textContent = 'Starting camera...';
+  try {
+    cameraUtil = new Camera(video, {
+      onFrame: async () => { await handsModel.send({ image: video }); },
+      width: 480, height: 360
+    });
+    await cameraUtil.start();
+    statusEl.textContent = '✦ Detecting hands — hold them up!';
+    renderLoop();
+  } catch(e) {
+    statusEl.textContent = 'Camera denied. Please allow camera access.';
+    overlay.classList.remove('hidden');
+  }
+}
+</script>
+</body>
+</html>
